@@ -1,3 +1,4 @@
+import cntk as C
 
 EmbeddingSize = 256
 SrcHiddenSize = 256
@@ -15,3 +16,4 @@ trainTrgF =  "D:/user/Shujie/Data/IWSLT/train/e.txt"
 valSrcF = "D:/user/Shujie/Data/IWSLT/valid/c.txt"
 valTrgF = "D:/user/Shujie/Data/IWSLT/valid/e.txt"
 
+defaultInit = C.initializer.glorot_normal

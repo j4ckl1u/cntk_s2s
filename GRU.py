@@ -1,19 +1,20 @@
 import cntk as C
+import Config
 
 class GRU:
 
     def __init__(self, inputSize, hiddenSize):
-        self.Wr = C.parameter(shape=(inputSize, hiddenSize), init=C.glorot_uniform())
-        self.Wrb = C.parameter(shape=(hiddenSize), init=C.glorot_uniform())
-        self.Wz = C.parameter(shape=(inputSize, hiddenSize), init=C.glorot_uniform())
-        self.Wzb = C.parameter(shape=(hiddenSize), init=C.glorot_uniform())
-        self.W = C.parameter(shape=(inputSize, hiddenSize), init=C.glorot_uniform())
-        self.Wb = C.parameter(shape=(hiddenSize), init=C.glorot_uniform())
+        self.Wr = C.parameter(shape=(inputSize, hiddenSize), init=Config.defaultInit())
+        self.Wrb = C.parameter(shape=(hiddenSize), init=Config.defaultInit())
+        self.Wz = C.parameter(shape=(inputSize, hiddenSize), init=Config.defaultInit())
+        self.Wzb = C.parameter(shape=(hiddenSize), init=Config.defaultInit())
+        self.W = C.parameter(shape=(inputSize, hiddenSize), init=Config.defaultInit())
+        self.Wb = C.parameter(shape=(hiddenSize), init=Config.defaultInit())
 
-        self.Ur = C.parameter(shape=(hiddenSize, hiddenSize), init=C.glorot_uniform())
-        self.Uz = C.parameter(shape=(hiddenSize, hiddenSize), init=C.glorot_uniform())
-        self.U = C.parameter(shape=(hiddenSize, hiddenSize), init=C.glorot_uniform())
-        self.Ub = C.parameter(shape=(hiddenSize), init=C.glorot_uniform())
+        self.Ur = C.parameter(shape=(hiddenSize, hiddenSize), init=Config.defaultInit())
+        self.Uz = C.parameter(shape=(hiddenSize, hiddenSize), init=Config.defaultInit())
+        self.U = C.parameter(shape=(hiddenSize, hiddenSize), init=Config.defaultInit())
+        self.Ub = C.parameter(shape=(hiddenSize), init=Config.defaultInit())
 
         self.Parameters = [self.Wr, self.Wrb, self.Wz, self.Wzb, self.W, self.Wb, self.Ur, self.Uz, self.U, self.Ub]
 
