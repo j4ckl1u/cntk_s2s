@@ -12,18 +12,19 @@ import NMT_Model
 import BiCorpus
 
 class GRU_NMT:
-    networkBucket = {}
 
     def __init__(self):
         self.model = NMT_Model.GRU_NMT_Model()
         self.trainData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.trainSrcF, Config.trainTrgF)
         self.valData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.valSrcF, Config.valTrgF)
-        self.exampleNet = self.getNetwork(5, 5)
+        self.networkBucket = {}
+        self.exampleNetwork = self.getNetwork(Config.BucketGap, Config.BucketGap)
         if os.path.isfile(Config.initModelF): self.model.loadModel(Config.initModelF)
 
     def getNetwork(self, lengthSrc, lengthTrg):
-        networkSrcid = (lengthSrc/5 if lengthSrc%5 ==0 else lengthSrc/5 + 1)*5
-        networkTrgid = (lengthTrg / 5 if lengthTrg % 5 == 0 else lengthTrg / 5 + 1) * 5
+        bucketGap = Config.BucketGap
+        networkSrcid = int(math.ceil(lengthSrc/float(bucketGap))*bucketGap)
+        networkTrgid = int(math.ceil(lengthTrg/float(bucketGap))*bucketGap)
         networkSrcid = networkSrcid if networkSrcid <= Config.SrcMaxLength else Config.SrcMaxLength
         networkTrgid = networkTrgid if networkTrgid <= Config.TrgMaxLength else Config.TrgMaxLength
 
@@ -34,8 +35,8 @@ class GRU_NMT:
     def train(self):
         cePerWordBest = 10000
         for i in range(0, 100000, 1):
-            print("traing with batch " + str(i), end="\r")
             cePerWordBest = self.validateAndSaveModel(i, cePerWordBest)
+            print("traing with batch " + str(i), end="\r")
 
             trainBatch = self.trainData.getTrainBatch()
             maxSrcLength = len(max(trainBatch, key=lambda x: x[0])[0])
@@ -67,6 +68,7 @@ class GRU_NMT:
         valBatch = self.valData.getValBatch()
         countAll = 0
         ceAll = 0
+        print("Validation ...", end="\r")
         while(valBatch):
             count = sum(len(s[1]) for s in valBatch)
             countAll += count

@@ -46,14 +46,13 @@ class Vocabulary:
             return self.word2ID["<unk>"]
 
 class BiCorpus:
-    srcVocab = Vocabulary()
-    trgVocab = Vocabulary()
-    sentencePairs = []
-    batchPool = []
-    batchId = 0
-    needShuffle = False
-    curSent = 0
     def __init__(self, srcVocabF, trgVocabF, srcF, trgF, shuffle = False):
+        self.srcVocab = Vocabulary()
+        self.trgVocab = Vocabulary()
+        self.sentencePairs = []
+        self.batchPool = []
+        self.batchId = 0
+        self.curSent = 0
         self.srcVocab.loadDict(srcVocabF)
         self.trgVocab.loadDict(trgVocabF)
         self.needShuffle = shuffle
@@ -110,7 +109,7 @@ class BiCorpus:
         return rBatch
 
     def getValBatch(self, num=Config.BatchSize):
-        if (self.curSent >= 100 or self.curSent >= len(self.sentencePairs) - 1):
+        if (self.curSent >= len(self.sentencePairs) - 1):
             self.curSent = 0
             return None
         sentences = []
