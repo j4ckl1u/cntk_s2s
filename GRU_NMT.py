@@ -119,6 +119,6 @@ class GRU_NMT:
         return (batchSrc, batchTrg, batchSrcMask, batchTrgMask)
 
 if __name__ == '__main__':
-    C.device.try_set_default_device(C.device.gpu(2))
+    C.device.try_set_default_device(C.device.gpu(Config.GPUID))
     gruNMT = GRU_NMT()
     gruNMT.train()
