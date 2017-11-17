@@ -6,7 +6,7 @@ import cntk as C
 import numpy as np
 import math
 from scipy.sparse import csr_matrix
-import GRU
+import RNN
 import Config
 import NMT_Model
 import BiCorpus

@@ -1,6 +1,7 @@
 import cntk as C
 
 GPUID = 0
+UseLSTM = False
 EmbeddingSize = 256
 SrcHiddenSize = 256
 TrgHiddenSize = 512
@@ -20,6 +21,6 @@ trainTrgF =  "D:/user/Shujie/Data/IWSLT/train/e.txt"
 valSrcF = "D:/user/Shujie/Data/IWSLT/valid/c.txt"
 valTrgF = "D:/user/Shujie/Data/IWSLT/valid/e.txt"
 modelF = "D:/user/Shujie/Data/IWSLT/model/cntk.model"
-initModelF = "D:/user/Shujie/Data/IWSLT/model/cntk.model.1000"
+initModelF = "D:/user/Shujie/Data/IWSLT/model/cntk.model.XX"
 
 defaultInit = C.initializer.glorot_normal

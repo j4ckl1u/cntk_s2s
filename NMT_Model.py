@@ -1,16 +1,17 @@
 import cntk as C
-import GRU
+import RNN
 import Config
 import  numpy as np
 
 class GRU_NMT_Model:
 
     def __init__(self):
+        RNNCell = RNN.GRUN if not Config.UseLSTM else RNN.LSTM
         self.EmbSrc = C.layers.Embedding(Config.EmbeddingSize, init=Config.defaultInit())
         self.EmbTrg = C.layers.Embedding(Config.EmbeddingSize, init=Config.defaultInit())
-        self.EncoderL2R = GRU.GRU(Config.EmbeddingSize, Config.SrcHiddenSize)
-        self.EncoderR2L = GRU.GRU(Config.EmbeddingSize, Config.SrcHiddenSize)
-        self.Decoder = GRU.GRU(Config.EmbeddingSize + Config.SrcHiddenSize*2, Config.TrgHiddenSize)
+        self.EncoderL2R = RNNCell(Config.EmbeddingSize, Config.SrcHiddenSize)
+        self.EncoderR2L = RNNCell(Config.EmbeddingSize, Config.SrcHiddenSize)
+        self.Decoder = RNNCell(Config.EmbeddingSize + Config.SrcHiddenSize * 2, Config.TrgHiddenSize)
         self.Wt = C.parameter(shape=(Config.TrgHiddenSize, Config.TrgVocabSize), init=Config.defaultInit())
         self.Wtb = C.parameter(shape=(Config.TrgVocabSize), init=Config.defaultInit())
         self.WI = C.parameter(shape=(Config.SrcHiddenSize, Config.TrgHiddenSize), init=Config.defaultInit())
@@ -31,12 +32,16 @@ class GRU_NMT_Model:
     def createEncoderNetwork(self, srcLength):
         networkHiddenSrcL2R = {}
         networkHiddenSrcR2L = {}
+        networkMemSrcL2R = {}
+        networkMemSrcR2L = {}
         inputSrc = C.reshape(self.inputMatrixSrc, shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcVocabSize))
         for i in range(0, srcLength, 1):
             networkHiddenSrcL2R[i] = self.EncoderL2R.createNetwork(self.EmbSrc(inputSrc[i]),
-                                                          self.firstHidden if i == 0 else networkHiddenSrcL2R[i - 1])
+                                                          self.firstHidden if i == 0 else networkHiddenSrcL2R[i - 1],
+                                                          None if not Config.UseLSTM else networkMemSrcL2R[i - 1])
             networkHiddenSrcR2L[srcLength - i - 1] = self.EncoderR2L.createNetwork(self.EmbSrc(inputSrc[srcLength - i - 1]),
-                                                          self.firstHidden if i == 0 else networkHiddenSrcR2L[srcLength - i])
+                                                          self.firstHidden if i == 0 else networkHiddenSrcR2L[srcLength - i],
+                                                          None if not Config.UseLSTM else networkMemSrcR2L[srcLength - i])
         networkHiddenSrc = []
         for i in range(0, srcLength, 1):
             networkHiddenSrc.append(C.splice(networkHiddenSrcL2R[i], networkHiddenSrcR2L[i], axis=2))
