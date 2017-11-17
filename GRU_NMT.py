@@ -32,11 +32,11 @@ class GRU_NMT:
         return self.networkBucket[(networkSrcid, networkTrgid)]
 
     def train(self):
+        cePerWordBest = 10000
         for i in range(0, 100000, 1):
-            if (i % 100 == 0):
-                self.validate()
-                self.model.saveModel(Config.modelF + "." + str(i))
             print("traing with batch " + str(i), end="\r")
+            cePerWordBest = self.validateAndSaveModel(i, cePerWordBest)
+
             trainBatch = self.trainData.getTrainBatch()
             maxSrcLength = len(max(trainBatch, key=lambda x: x[0])[0])
             maxTrgLength = len(max(trainBatch, key=lambda x: x[1])[1])
@@ -53,6 +53,14 @@ class GRU_NMT:
     def mySGDUpdate(self, batchGrad):
         for parameter in batchGrad:
             parameter.value = parameter.value - Config.LearningRate * batchGrad[parameter]
+
+    def validateAndSaveModel(self, i, cePerWordBest):
+        if (i % Config.ValiditionPerBatch == 0):
+            cePerWord = self.validate()
+            if (cePerWord < cePerWordBest):
+                self.model.saveModel(Config.modelF + "." + str(i))
+                cePerWordBest = cePerWord
+        return cePerWordBest
 
     def validate(self):
         self.curValSent = 0
@@ -73,7 +81,9 @@ class GRU_NMT:
                                       self.model.maskMatrixTrg: batchTrgMask})
             ceAll += ce
             valBatch = self.valData.getValBatch()
-        print("Validation cross entropy :" + str(ceAll/countAll))
+        cePerWord = ceAll/countAll
+        print("Validation cross entropy :" + str(cePerWord))
+        return cePerWord
 
     def buildInputMono(self, sentences, srctrg = 0):
         vocabSize = Config.SrcVocabSize if srctrg==0 else Config.TrgVocabSize

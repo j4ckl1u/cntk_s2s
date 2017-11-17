@@ -9,6 +9,8 @@ SrcMaxLength = 60
 TrgMaxLength = 60
 BatchSize = 8
 LearningRate = 0.0001
+ValiditionPerBatch = 1000
+
 srcVocabF = "D:/user/Shujie/Data/IWSLT/train/c.dict.txt"
 trgVocabF = "D:/user/Shujie/Data/IWSLT/train/e.dict.txt"
 trainSrcF = "D:/user/Shujie/Data/IWSLT/train/c.txt"
