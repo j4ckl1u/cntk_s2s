@@ -1,7 +1,7 @@
 import cntk as C
 
 GPUID = 0
-UseLSTM = False
+UseLSTM = True
 EmbeddingSize = 256
 SrcHiddenSize = 256
 TrgHiddenSize = 512

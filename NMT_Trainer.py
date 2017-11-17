@@ -27,13 +27,13 @@ class GRU_NMT:
         networkTrgid = int(math.ceil(lengthTrg/float(bucketGap))*bucketGap)
         networkSrcid = networkSrcid if networkSrcid <= Config.SrcMaxLength else Config.SrcMaxLength
         networkTrgid = networkTrgid if networkTrgid <= Config.TrgMaxLength else Config.TrgMaxLength
-
+        if(lengthSrc == 60 and lengthTrg == 60):
+            lengthSrc = lengthTrg
         if(not self.networkBucket.has_key((networkSrcid, networkTrgid))):
             print("Creating network (" + str(networkSrcid) + "," + str(networkTrgid) + ")", end="\r")
             self.networkBucket[(networkSrcid, networkTrgid)] = self.model.createNetwork(networkSrcid, networkTrgid)
-            print("Bucket contains network for ", end="")
-            for key in self.networkBucket:
-                print("(" + str(key[0]) + "," + str(key[1]) + ")", end=" ")
+            print("Bucket contains networks for ", end="")
+            for key in self.networkBucket: print("(" + str(key[0]) + "," + str(key[1]) + ")", end=" ")
             print()
         return self.networkBucket[(networkSrcid, networkTrgid)]
 

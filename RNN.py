@@ -34,7 +34,7 @@ class GRU:
         HTilde = C.tanh(WX + UHR)
 
         CurH = C.element_times(HTilde, 1-Z) + C.element_times(preHidden, Z)
-        return CurH
+        return (CurH, None)
 
 class GRUN:
 
@@ -58,7 +58,7 @@ class GRUN:
         HTilde = C.tanh(C.slice(UH, -1, self.hiddenSize*2, self.hiddenSize*3) + UHR)
 
         CurH = C.element_times(HTilde, 1-Z) + C.element_times(preHidden, Z)
-        return CurH
+        return (CurH, None)
 
 class LSTM:
 
