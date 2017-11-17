@@ -3,8 +3,11 @@ import re
 from random import shuffle
 
 class Vocabulary:
-    word2ID = {}
-    id2Word = []
+
+    def __init__(self):
+        self.word2ID = {}
+        self.id2Word = []
+
     def loadDict(self, dictf):
         f = open(dictf)
         line = f.readline()
@@ -46,6 +49,7 @@ class Vocabulary:
             return self.word2ID["<unk>"]
 
 class BiCorpus:
+
     def __init__(self, srcVocabF, trgVocabF, srcF, trgF, shuffle = False):
         self.srcVocab = Vocabulary()
         self.trgVocab = Vocabulary()
