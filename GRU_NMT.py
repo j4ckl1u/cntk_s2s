@@ -13,10 +13,13 @@ import BiCorpus
 
 class GRU_NMT:
     networkBucket = {}
+
     def __init__(self):
         self.model = NMT_Model.GRU_NMT_Model()
         self.trainData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.trainSrcF, Config.trainTrgF)
         self.valData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.valSrcF, Config.valTrgF)
+        self.exampleNet = self.getNetwork(5, 5)
+        if os.path.isfile(Config.initModelF): self.loadModel(Config.initModelF)
 
     def getNetwork(self, lengthSrc, lengthTrg):
         networkSrcid = (lengthSrc/5 if lengthSrc%5 ==0 else lengthSrc/5 + 1)*5
@@ -32,6 +35,7 @@ class GRU_NMT:
         for i in range(0, 100000, 1):
             if (i % 1000 == 0):
                 self.validate()
+                self.saveModel(Config.modelF + "." + str(i))
             print("traing with batch " + str(i), end="\r")
             trainBatch = self.trainData.getTrainBatch()
             maxSrcLength = len(max(trainBatch, key=lambda x: x[0])[0])
@@ -99,6 +103,13 @@ class GRU_NMT:
         (batchSrc, batchSrcMask) = self.buildInputMono(sentences, 0)
         (batchTrg, batchTrgMask) = self.buildInputMono(sentences, 1)
         return (batchSrc, batchTrg, batchSrcMask, batchTrgMask)
+
+    def saveModel(self, modelf):
+        self.exampleNet.save(modelf)
+
+    def loadModel(self, modelf):
+        self.exampleNet.load(modelf)
+
 
 if __name__ == '__main__':
     C.device.try_set_default_device(C.device.gpu(2))

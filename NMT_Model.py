@@ -66,7 +66,6 @@ class GRU_NMT_Model:
         contextVector =C.reduce_sum(C.reshape(attVector, shape=(srcLength, Config.BatchSize * srcHiddenSize)), axis=0)
         return C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
 
-
     def createDecoderNetwork(self, networkHiddenSrc, initTrgHidden, srcLength, trgLength):
         networkHiddenTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
