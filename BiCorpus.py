@@ -110,7 +110,7 @@ class BiCorpus:
         return rBatch
 
     def getValBatch(self, num=Config.BatchSize):
-        if (self.curSent >= 1000 or self.curSent >= len(self.sentencePairs) - 1):
+        if (self.curSent >= 100 or self.curSent >= len(self.sentencePairs) - 1):
             self.curSent = 0
             return None
         sentences = []

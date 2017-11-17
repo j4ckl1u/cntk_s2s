@@ -1,7 +1,7 @@
 import cntk as C
 import GRU
 import Config
-
+import  numpy as np
 
 class GRU_NMT_Model:
 
@@ -88,3 +88,19 @@ class GRU_NMT_Model:
         (networkHiddenSrc, initTrgHidden) = self.createEncoderNetwork(srcLength)
         decoderNet = self.createDecoderNetwork(networkHiddenSrc, initTrgHidden, srcLength, trgLength)
         return decoderNet
+
+    def saveModel(self, filename):
+        print("Saving model " + filename)
+        f = open(filename, "wb")
+        for parameter in self.Parameters:
+            pValue = parameter.value
+            np.save(f, pValue)
+        f.close()
+
+    def loadModel(self, filename):
+        print("Loading model " + filename)
+        f = open(filename, "rb")
+        for parameter in self.Parameters:
+            pValue = np.load(f)
+            parameter.value = pValue
+        f.close()

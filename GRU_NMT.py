@@ -19,7 +19,7 @@ class GRU_NMT:
         self.trainData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.trainSrcF, Config.trainTrgF)
         self.valData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.valSrcF, Config.valTrgF)
         self.exampleNet = self.getNetwork(5, 5)
-        if os.path.isfile(Config.initModelF): self.loadModel(Config.initModelF)
+        if os.path.isfile(Config.initModelF): self.model.loadModel(Config.initModelF)
 
     def getNetwork(self, lengthSrc, lengthTrg):
         networkSrcid = (lengthSrc/5 if lengthSrc%5 ==0 else lengthSrc/5 + 1)*5
@@ -33,9 +33,9 @@ class GRU_NMT:
 
     def train(self):
         for i in range(0, 100000, 1):
-            if (i % 1000 == 0):
+            if (i % 100 == 0):
                 self.validate()
-                self.saveModel(Config.modelF + "." + str(i))
+                self.model.saveModel(Config.modelF + "." + str(i))
             print("traing with batch " + str(i), end="\r")
             trainBatch = self.trainData.getTrainBatch()
             maxSrcLength = len(max(trainBatch, key=lambda x: x[0])[0])
@@ -71,12 +71,9 @@ class GRU_NMT:
                                       self.model.inputMatrixTrg:batchTrg,
                                       self.model.maskMatrixSrc:batchSrcMask,
                                       self.model.maskMatrixTrg: batchTrgMask})
-            #for sentence in valBatch:
-            #    print(str(len(sentence)), end="\t")
-            #print(str(ce) + "/" + str(count) + "=" + str(ce/count))
             ceAll += ce
             valBatch = self.valData.getValBatch()
-        print(" Validation cross entropy :" + str(ceAll/countAll))
+        print("Validation cross entropy :" + str(ceAll/countAll))
 
     def buildInputMono(self, sentences, srctrg = 0):
         vocabSize = Config.SrcVocabSize if srctrg==0 else Config.TrgVocabSize
@@ -103,13 +100,6 @@ class GRU_NMT:
         (batchSrc, batchSrcMask) = self.buildInputMono(sentences, 0)
         (batchTrg, batchTrgMask) = self.buildInputMono(sentences, 1)
         return (batchSrc, batchTrg, batchSrcMask, batchTrgMask)
-
-    def saveModel(self, modelf):
-        self.exampleNet.save(modelf)
-
-    def loadModel(self, modelf):
-        self.exampleNet.load(modelf)
-
 
 if __name__ == '__main__':
     C.device.try_set_default_device(C.device.gpu(2))
