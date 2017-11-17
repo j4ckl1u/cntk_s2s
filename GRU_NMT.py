@@ -29,14 +29,19 @@ class GRU_NMT:
         networkTrgid = networkTrgid if networkTrgid <= Config.TrgMaxLength else Config.TrgMaxLength
 
         if(not self.networkBucket.has_key((networkSrcid, networkTrgid))):
+            print("Creating network (" + str(networkSrcid) + "," + str(networkTrgid) + ")", end="\r")
             self.networkBucket[(networkSrcid, networkTrgid)] = self.model.createNetwork(networkSrcid, networkTrgid)
+            print("Bucket contains network for ", end="")
+            for key in self.networkBucket:
+                print("(" + str(key[0]) + "," + str(key[1]) + ")", end=" ")
+            print()
         return self.networkBucket[(networkSrcid, networkTrgid)]
 
     def train(self):
         cePerWordBest = 10000
         for i in range(0, 100000, 1):
             cePerWordBest = self.validateAndSaveModel(i, cePerWordBest)
-            print("traing with batch " + str(i), end="\r")
+            print("Traing with batch " + str(i), end="\r")
 
             trainBatch = self.trainData.getTrainBatch()
             maxSrcLength = len(max(trainBatch, key=lambda x: x[0])[0])

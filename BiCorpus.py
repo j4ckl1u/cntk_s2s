@@ -63,7 +63,7 @@ class BiCorpus:
         self.loadData(srcF, trgF)
 
     def loadData(self, fileSrc, fileTrg):
-        print("loading data " + fileSrc + "-->" + fileTrg)
+        print("Loading data " + fileSrc + "-->" + fileTrg)
         sentences = []
         fsrc=open(fileSrc)
         ftrg = open(fileTrg)
