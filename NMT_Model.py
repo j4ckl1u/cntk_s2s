@@ -3,7 +3,7 @@ import RNN
 import Config
 import  numpy as np
 
-class GRU_NMT_Model:
+class NMT_Model:
 
     def __init__(self):
         RNNCell = RNN.GRUN if not Config.UseLSTM else RNN.LSTM
@@ -81,7 +81,7 @@ class GRU_NMT_Model:
         networkMemTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
         tce = 0
-        for i in range(0, trgLength - 1, 1):
+        for i in range(0, trgLength, 1):
             if (i == 0):
                 networkHiddenTrg[i] = self.createDecoderInitNetwork(initTrgHidden)
                 networkMemTrg[i] = networkHiddenTrg[i]

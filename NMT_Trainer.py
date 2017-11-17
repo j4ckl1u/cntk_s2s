@@ -9,14 +9,14 @@ from scipy.sparse import csr_matrix
 import RNN
 import Config
 import NMT_Model
-import BiCorpus
+import Corpus
 
-class GRU_NMT:
+class NMT_Trainer:
 
     def __init__(self):
-        self.model = NMT_Model.GRU_NMT_Model()
-        self.trainData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.trainSrcF, Config.trainTrgF)
-        self.valData = BiCorpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.valSrcF, Config.valTrgF)
+        self.model = NMT_Model.NMT_Model()
+        self.trainData = Corpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.trainSrcF, Config.trainTrgF)
+        self.valData = Corpus.BiCorpus(Config.srcVocabF, Config.trgVocabF, Config.valSrcF, Config.valTrgF)
         self.networkBucket = {}
         self.exampleNetwork = self.getNetwork(Config.BucketGap, Config.BucketGap)
         if os.path.isfile(Config.initModelF): self.model.loadModel(Config.initModelF)
@@ -27,8 +27,6 @@ class GRU_NMT:
         networkTrgid = int(math.ceil(lengthTrg/float(bucketGap))*bucketGap)
         networkSrcid = networkSrcid if networkSrcid <= Config.SrcMaxLength else Config.SrcMaxLength
         networkTrgid = networkTrgid if networkTrgid <= Config.TrgMaxLength else Config.TrgMaxLength
-        if(lengthSrc == 60 and lengthTrg == 60):
-            lengthSrc = lengthTrg
         if(not self.networkBucket.has_key((networkSrcid, networkTrgid))):
             print("Creating network (" + str(networkSrcid) + "," + str(networkTrgid) + ")", end="\r")
             self.networkBucket[(networkSrcid, networkTrgid)] = self.model.createNetwork(networkSrcid, networkTrgid)
@@ -44,8 +42,8 @@ class GRU_NMT:
             print("Traing with batch " + str(i), end="\r")
 
             trainBatch = self.trainData.getTrainBatch()
-            maxSrcLength = len(max(trainBatch, key=lambda x: x[0])[0])
-            maxTrgLength = len(max(trainBatch, key=lambda x: x[1])[1])
+            maxSrcLength = max(len(x[0]) for x in trainBatch)
+            maxTrgLength = max(len(x[1]) for x in trainBatch)
             network = self.getNetwork(maxSrcLength, maxTrgLength)
 
             (batchSrc, batchTrg, batchSrcMask, batchTrgMask) = self.buildInput(trainBatch)
@@ -102,7 +100,7 @@ class GRU_NMT:
                 if (j < len(sentences) and i < len(sentences[j][srctrg])):
                     sent.append(sentences[j][srctrg][i])
                 else:
-                    sent.append(self.trainData.getEndId(i==0))
+                    sent.append(self.trainData.getEndId(srctrg==0))
         batch = C.Value.one_hot(sent, vocabSize)
 
         batchMask = np.zeros((maxLength, Config.BatchSize), dtype=np.float32)
@@ -120,5 +118,5 @@ class GRU_NMT:
 
 if __name__ == '__main__':
     C.device.try_set_default_device(C.device.gpu(Config.GPUID))
-    gruNMT = GRU_NMT()
-    gruNMT.train()
+    nmtTrainer = NMT_Trainer()
+    nmtTrainer.train()

@@ -48,6 +48,75 @@ class Vocabulary:
         else:
             return self.word2ID["<unk>"]
 
+class MonoCorpus:
+
+    def __init__(self, vocabF, file, shuffle = False):
+        self.vocab = Vocabulary()
+        self.sentences = []
+        self.batchPool = []
+        self.batchId = 0
+        self.curSent = 0
+        self.vocab.loadDict(vocabF)
+        self.needShuffle = shuffle
+        self.loadData(file)
+
+    def loadData(self, file):
+        print("Loading data " + file)
+        sentences = []
+        f=open(file)
+        line = f.readline()
+        while line:
+            line = line.strip()
+            words = re.split("\s+", line)
+            wordIDs = []
+            for word in words:
+                wordIDs.append(self.vocab.getID(word))
+            self.sentences.append(wordIDs)
+            line = f.readline()
+        f.close()
+
+    def buildBatchPool(self):
+        batchPool = []
+        sents = self.getSentences(Config.BatchSize * 100)
+        sents = sorted(sents, key=lambda sent : len(sent))
+        self.batchPool = [sents[x:x + Config.BatchSize] for x in xrange(0, len(sents), Config.BatchSize)]
+        shuffle(self.batchPool)
+        self.batchId = 0
+
+    def reset(self):
+        self.curSent = 0
+        if (self.needShuffle): shuffle(self.sentences)
+
+    def getSentences(self, num):
+        sentences = []
+        for i in range(0, num, 1):
+            if(self.curSent + i >= len(self.sentences)-1): self.reset()
+            sentence = self.sentences[self.curSent + i]
+            sentences.append(sentence)
+        self.curSent += len(sentences)
+        return sentences
+
+    def getTrainBatch(self):
+        if(self.batchId >= len(self.batchPool) -1): self.buildBatchPool()
+        rBatch = self.batchPool[self.batchId]
+        self.batchId += 1
+        return rBatch
+
+    def getValBatch(self, num=Config.BatchSize):
+        if (self.curSent >= len(self.sentences) - 1):
+            self.curSent = 0
+            return None
+        sentences = []
+        for i in range(0, num, 1):
+            if(self.curSent + i >= len(self.sentences)): break
+            sentence = self.sentences[self.curSent + i]
+            sentences.append(sentence)
+        self.curSent += len(sentences)
+        return sentences
+
+    def getEndId(self):
+        return self.vocab.getID("</s>")
+
 class BiCorpus:
 
     def __init__(self, srcVocabF, trgVocabF, srcF, trgF, shuffle = False):
