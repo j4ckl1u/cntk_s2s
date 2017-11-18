@@ -81,7 +81,7 @@ class NMT_Model:
         networkMemTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
         tce = 0
-        for i in range(0, trgLength, 1):
+        for i in range(0, trgLength-1, 1):
             if (i == 0):
                 networkHiddenTrg[i] = self.createDecoderInitNetwork(initTrgHidden)
                 networkMemTrg[i] = networkHiddenTrg[i]
