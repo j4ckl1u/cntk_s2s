@@ -11,7 +11,7 @@ class NMT_Model:
         self.EmbTrg = C.layers.Embedding(Config.EmbeddingSize, init=Config.defaultInit())
         self.EncoderL2R = RNNCell(Config.EmbeddingSize, Config.SrcHiddenSize)
         self.EncoderR2L = RNNCell(Config.EmbeddingSize, Config.SrcHiddenSize)
-        self.Decoder = RNNCell(Config.EmbeddingSize + Config.SrcHiddenSize * 2, Config.TrgHiddenSize)
+        self.Decoder = RNN.GRUN(Config.EmbeddingSize + Config.SrcHiddenSize * 2, Config.TrgHiddenSize)
         self.Wt = C.parameter(shape=(Config.TrgHiddenSize, Config.TrgVocabSize), init=Config.defaultInit())
         self.Wtb = C.parameter(shape=(Config.TrgVocabSize), init=Config.defaultInit())
         self.WI = C.parameter(shape=(Config.SrcHiddenSize, Config.TrgHiddenSize), init=Config.defaultInit())
@@ -58,8 +58,8 @@ class NMT_Model:
             sourceHidden = C.reshape(networkHiddenSrc[0], shape=(1, Config.BatchSize, Config.SrcHiddenSize*2))
         return (sourceHidden, networkHiddenSrcR2L[0] + networkHiddenSrcL2R[srcLength-1])
 
-    def createDecoderInitNetwork(self, initTrgHidden):
-        WIS = C.times(initTrgHidden, self.WI) + self.WIb
+    def createDecoderInitNetwork(self, srcLastHidden):
+        WIS = C.times(srcLastHidden, self.WI) + self.WIb
         return C.tanh(WIS)
 
     def createAttentionNet(self, hiddenSrc, curHiddenTrg, srcLength):
@@ -76,20 +76,18 @@ class NMT_Model:
         contextVector =C.reduce_sum(C.reshape(attVector, shape=(srcLength, Config.BatchSize * srcHiddenSize)), axis=0)
         return C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
 
-    def createDecoderNetwork(self, networkHiddenSrc, initTrgHidden, srcLength, trgLength):
+    def createDecoderNetwork(self, networkHiddenSrc, sourceLastHidden, srcLength, trgLength):
         networkHiddenTrg = {}
-        networkMemTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
         tce = 0
         for i in range(0, trgLength-1, 1):
             if (i == 0):
-                networkHiddenTrg[i] = self.createDecoderInitNetwork(initTrgHidden)
-                networkMemTrg[i] = networkHiddenTrg[i]
+                networkHiddenTrg[i] = self.createDecoderInitNetwork(sourceLastHidden)
             else:
                 contextVect = self.createAttentionNet(networkHiddenSrc, networkHiddenTrg[i - 1], srcLength)
                 curWord = self.EmbTrg(inputTrg[i])
                 curInput = C.splice(contextVect, curWord, axis=2)
-                (networkHiddenTrg[i], networkMemTrg[i]) = self.Decoder.createNetwork(curInput, networkHiddenTrg[i - 1], networkMemTrg[i-1])
+                networkHiddenTrg[i] = self.Decoder.createNetwork(curInput, networkHiddenTrg[i - 1])[0]
 
             preSoftmax = C.times(networkHiddenTrg[i], self.Wt) + self.Wtb
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i + 1], 2)
@@ -98,9 +96,27 @@ class NMT_Model:
         return tce
 
     def createNetwork(self, srcLength, trgLength):
-        (networkHiddenSrc, initTrgHidden) = self.createEncoderNetwork(srcLength)
-        decoderNet = self.createDecoderNetwork(networkHiddenSrc, initTrgHidden, srcLength, trgLength)
+        (networkHiddenSrc, sourceLastHidden) = self.createEncoderNetwork(srcLength)
+        decoderNet = self.createDecoderNetwork(networkHiddenSrc, sourceLastHidden, srcLength, trgLength)
         return decoderNet
+
+    def createTestingDecoderInitNetwork(self, srcSentEmb):
+        WIS = C.times(srcSentEmb, self.WI) + self.WIb
+        return C.tanh(WIS)
+
+    def createTestingPredictNetwork(self, decoderHidden):
+        preSoftmax = C.times(decoderHidden, self.Wt) + self.Wtb
+        nextWordProb = C.softmax(preSoftmax)
+        bestTrans = C.reshape(C.argmax(nextWordProb, -1), shape=(Config.BatchSize))
+        return bestTrans
+
+    def createTestingDecoderNetwork(self, srcHiddenStates, decoderPreWord, decoderPreHidden, srcLength):
+        srcHiddenStates = C.reshape(srcHiddenStates, shape=(srcLength, Config.BatchSize, Config.SrcHiddenSize*2))
+        contextVect = self.createAttentionNet(srcHiddenStates, decoderPreHidden, srcLength)
+        preWord = self.EmbTrg(decoderPreWord )
+        curInput = C.splice(contextVect, preWord, axis=2)
+        (networkHiddenTrg, networkMemTrg) = self.Decoder.createNetwork(curInput, decoderPreHidden)
+        return  networkHiddenTrg
 
     def saveModel(self, filename):
         print("Saving model " + filename)

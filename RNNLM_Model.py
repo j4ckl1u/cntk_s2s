@@ -35,7 +35,6 @@ class LM_Model:
                            C.reshape(self.maskMatrixTrg[i], shape=(Config.BatchSize, 1)))
         return tce
 
-
     def saveModel(self, filename):
         print("Saving model " + filename)
         f = open(filename, "wb")
