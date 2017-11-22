@@ -1,7 +1,7 @@
 import cntk as C
 
 GPUID = 0
-UseLSTM = True
+UseLSTM = False
 EmbeddingSize = 256
 SrcHiddenSize = 256
 TrgHiddenSize = 512
@@ -21,7 +21,7 @@ trainTrgF =  "D:/user/Shujie/Data/IWSLT/train/e.txt"
 valSrcF = "D:/user/Shujie/Data/IWSLT/valid/c.txt"
 valTrgF = "D:/user/Shujie/Data/IWSLT/valid/e.txt"
 modelF = "D:/user/Shujie/Data/IWSLT/model/cntk.model"
-initModelF = "D:/user/Shujie/Data/IWSLT/model/cntk.model.XX"
+initModelF = "D:/user/Shujie/Data/IWSLT/model/cntk.model.187000"
 
 #trgVocabF = "D:/user/Shujie/Data/PennLM/data/dict.txt"
 #trainTrgF =  "D:/user/Shujie/Data/PennLM/data/ptb.train.txt"

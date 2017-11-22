@@ -54,8 +54,8 @@ class GRUN:
         R = C.sigmoid(C.slice(WX, -1, 0, self.hiddenSize) + C.slice(UH, -1, 0, self.hiddenSize))
         Z = C.sigmoid(C.slice(WX, -1, self.hiddenSize, self.hiddenSize*2) + C.slice(UH, -1, self.hiddenSize, self.hiddenSize*2))
 
-        UHR = C.element_times(C.slice(WX, -1, self.hiddenSize*2, self.hiddenSize*3), R)
-        HTilde = C.tanh(C.slice(UH, -1, self.hiddenSize*2, self.hiddenSize*3) + UHR)
+        UHR = C.element_times(C.slice(UH, -1, self.hiddenSize*2, self.hiddenSize*3), R)
+        HTilde = C.tanh(C.slice(WX, -1, self.hiddenSize*2, self.hiddenSize*3) + UHR)
 
         CurH = C.element_times(HTilde, 1-Z) + C.element_times(preHidden, Z)
         return (CurH, None)

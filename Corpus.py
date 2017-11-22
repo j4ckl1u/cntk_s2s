@@ -48,6 +48,18 @@ class Vocabulary:
         else:
             return self.word2ID["<unk>"]
 
+    def getWord(self, wordID):
+        if wordID < len(self.id2Word):
+            return self.id2Word[wordID]
+        else:
+            return "<unk>"
+
+    def getWordList(self, wordIDs):
+        return [self.getWord(id) for id in wordIDs]
+
+    def getIDList(self, words):
+        return [self.getID(word) for word in words]
+
 class MonoCorpus:
 
     def __init__(self, vocabF, file, shuffle = False):
@@ -68,9 +80,7 @@ class MonoCorpus:
         while line:
             line = line.strip()
             words = re.split("\s+", line)
-            wordIDs = []
-            for word in words:
-                wordIDs.append(self.vocab.getID(word))
+            wordIDs = self.vocab.getIDList(words)
             self.sentences.append(wordIDs)
             line = f.readline()
         f.close()
@@ -140,15 +150,11 @@ class BiCorpus:
         while line:
             line = line.strip()
             words = re.split("\s+", line)
-            srcS = []
-            for word in words:
-                srcS.append(self.srcVocab.getID(word))
+            srcS = self.srcVocab.getIDList(words)
             line = ftrg.readline()
             line = line.strip() + " </s>"
             words = re.split("\s+", line)
-            trgS = []
-            for word in words:
-                trgS.append(self.trgVocab.getID(word))
+            trgS = self.trgVocab.getIDList(words)
             self.sentencePairs.append((srcS, trgS))
             line = fsrc.readline()
         fsrc.close()
@@ -174,6 +180,14 @@ class BiCorpus:
             sentences.append(sentence)
         self.curSent += len(sentences)
         return sentences
+
+    def iD2SentPairs(self, idsPair):
+        srcSent = self.srcVocab.getWordList(idsPair[0])
+        trgSent = self.trgVocab.getWordList(idsPair[1])
+        return (srcSent, trgSent)
+
+    def iD2Sent(self, ids, src=True):
+        return self.srcVocab.getWordList(ids) if src else self.trgVocab.getWordList(ids)
 
     def getTrainBatch(self):
         if(self.batchId >= len(self.batchPool) -1): self.buildBatchPool()

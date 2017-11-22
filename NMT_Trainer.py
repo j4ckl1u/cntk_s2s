@@ -63,7 +63,7 @@ class NMT_Trainer:
 
     def validateAndSaveModel(self, i, bestValScore):
         if (i % Config.ValiditionPerBatch == 0):
-            valScore = self.validate()
+            valScore = self.validateBLEU()
             if (valScore < bestValScore):
                 self.model.saveModel(Config.modelF + "." + str(i))
                 bestValScore = valScore
@@ -138,9 +138,11 @@ class NMT_Trainer:
         valTrgTrans=[]
         print("Validation ...", end="\r")
         while (valBatch):
-            src = [pair[0] for pair in valBatch]
-            golden = [pair[1] for par in valBatch]
-            trans = self.greedyDecoding(src)
+            srcIds = [pair[0] for pair in valBatch]
+            transIDs = self.greedyDecoding(srcIds)
+            src = [self.trainData.iD2Sent(srcId, True) for srcId in srcIds]
+            golden = [self.trainData.iD2Sent(pair[1], False) for pair in valBatch]
+            trans = [self.trainData.iD2Sent(tran, False) for tran in transIDs]
             valSrc.extend(src)
             valTrgGolden.extend(golden)
             valTrgTrans.extend(trans)

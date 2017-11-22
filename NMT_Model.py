@@ -56,7 +56,7 @@ class NMT_Model:
                 sourceHidden = C.splice(sourceHidden, networkHiddenSrc[i], axis=0)
         else:
             sourceHidden = C.reshape(networkHiddenSrc[0], shape=(1, Config.BatchSize, Config.SrcHiddenSize*2))
-        return (sourceHidden, networkHiddenSrcR2L[0] + networkHiddenSrcL2R[srcLength-1])
+        return (sourceHidden, networkHiddenSrcR2L[0])
 
     def createDecoderInitNetwork(self, srcLastHidden):
         WIS = C.times(srcLastHidden, self.WI) + self.WIb
