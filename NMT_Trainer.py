@@ -22,6 +22,8 @@ class NMT_Trainer:
         self.decoder = NMT_Decoder.NMT_Decoder(self.model, self.srcVocab, self.trgVocab)
         self.networkBucket = {}
         self.exampleNetwork = self.getNetwork(1, 1)
+        self.bestValCE = 999999
+        self.bestBleu = 0
         self.badValCount = 0
         self.maxBadVal = 5
         self.learningRate = Config.LearningRate

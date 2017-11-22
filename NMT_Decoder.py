@@ -14,7 +14,8 @@ class NMT_Decoder:
         self.srcVocab = srcVocab
         self.trgVocab = trgVocab
         self.networkBucket = {}
-        self.srcHiddenStatesMem = np.zeros(shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcHiddenSize * 2))
+        self.srcHiddenStatesMem = np.zeros(shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcHiddenSize * 2), dtype=np.float32)
+        self.srcSentEmbMem = np.zeros(shape=(1, Config.BatchSize, Config.SrcHiddenSize), dtype=np.float32)
         self.srcHiddenStates = C.input_variable(shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcHiddenSize * 2))
         self.srcSentEmb = C.input_variable(shape=(Config.BatchSize, Config.SrcHiddenSize))
         self.decoderPreHidden = C.input_variable(shape=(Config.BatchSize, Config.TrgHiddenSize))
@@ -40,9 +41,9 @@ class NMT_Decoder:
         (batchSrc, batchSrcMask) = Corpus.MonoCorpus.buildInputMono(src, Config.SrcVocabSize, Config.SrcMaxLength, self.srcVocab.getEndId())
         sourceHiddens = sourceHiddenNet.eval({self.model.inputMatrixSrc: batchSrc})
         sourceHiddens = sourceHiddens.reshape(maxSrcLength, Config.BatchSize, Config.SrcHiddenSize * 2)
-        srcSentEmbV = sourceHiddens[0:1, 0:Config.BatchSize, Config.SrcHiddenSize:Config.SrcHiddenSize * 2]
+        self.srcSentEmbMem[:,:,:] = sourceHiddens[0:1, :, Config.SrcHiddenSize:Config.SrcHiddenSize * 2]
         self.srcHiddenStatesMem[0:maxSrcLength,:,:] = sourceHiddens
-        decoderHidden = decoderInitNet.eval({self.srcSentEmb: srcSentEmbV})
+        decoderHidden = decoderInitNet.eval({self.srcSentEmb: self.srcSentEmbMem})
         trans = predictNet.eval({self.decoderPreHidden: decoderHidden})
         count = 0
         transCands = []
