@@ -50,8 +50,8 @@ class NMT_Model:
             sourceHidden = C.reshape(networkHiddenSrc[0], shape=(1, Config.BatchSize, Config.SrcHiddenSize*2))
         return sourceHidden
 
-    def createDecoderInitNetwork(self, srcLastHidden):
-        WIS = C.times(srcLastHidden, self.WI) + self.WIb
+    def createDecoderInitNetwork(self, srcSentEmb):
+        WIS = C.times(srcSentEmb, self.WI) + self.WIb
         return C.tanh(WIS)
 
     def createAttentionNet(self, hiddenSrc, curHiddenTrg, srcLength):
@@ -68,25 +68,28 @@ class NMT_Model:
         contextVector =C.reduce_sum(C.reshape(attVector, shape=(srcLength, Config.BatchSize * srcHiddenSize)), axis=0)
         return C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
 
+    def createDecoderRNNNetwork(self, srcHiddenStates, preWord, preHidden, srcLength):
+        contextVect = self.createAttentionNet(srcHiddenStates, preHidden, srcLength)
+        preWord = self.EmbTrg(preWord)
+        curInput = C.splice(contextVect, preWord, axis=-1)
+        networkHiddenTrg = self.Decoder.createNetwork(curInput, preHidden)
+        return networkHiddenTrg
+
     def createDecoderNetwork(self, networkHiddenSrc, srcLength, trgLength):
         timeZeroHidden = C.slice(networkHiddenSrc, 0, 0, 1)
-        sentEmb = C.slice(timeZeroHidden, -1, Config.SrcHiddenSize, Config.SrcHiddenSize*2)
+        srcSentEmb = C.slice(timeZeroHidden, -1, Config.SrcHiddenSize, Config.SrcHiddenSize*2)
         networkHiddenTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
         tce = 0
         for i in range(0, trgLength, 1):
             if (i == 0):
-                networkHiddenTrg[i] = self.createDecoderInitNetwork(sentEmb)
+                networkHiddenTrg[i] = self.createDecoderInitNetwork(srcSentEmb)
             else:
-                contextVect = self.createAttentionNet(networkHiddenSrc, networkHiddenTrg[i - 1], srcLength)
-                curWord = self.EmbTrg(inputTrg[i])
-                curInput = C.splice(contextVect, curWord, axis=2)
-                networkHiddenTrg[i] = self.Decoder.createNetwork(curInput, networkHiddenTrg[i - 1])[0]
+                networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, inputTrg[i], networkHiddenTrg[i - 1], srcLength)
 
             preSoftmax = C.times(networkHiddenTrg[i], self.Wt) + self.Wtb
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i], 2)
-            tce += C.times(C.reshape(ce, shape=(1, Config.BatchSize)),
-                           C.reshape(self.maskMatrixTrg[i], shape=(Config.BatchSize, 1)))
+            tce += C.times_transpose(C.reshape(ce, shape=(1, Config.BatchSize)), self.maskMatrixTrg[i])
         return tce
 
     def createNetwork(self, srcLength, trgLength):
@@ -94,23 +97,13 @@ class NMT_Model:
         decoderNet = self.createDecoderNetwork(networkHiddenSrc, srcLength, trgLength)
         return decoderNet
 
-    def createTestingDecoderInitNetwork(self, srcSentEmb):
-        WIS = C.times(srcSentEmb, self.WI) + self.WIb
-        return C.tanh(WIS)
-
-    def createTestingPredictNetwork(self, decoderHidden):
+    def createPredictionNetwork(self, decoderHidden):
         preSoftmax = C.times(decoderHidden, self.Wt) + self.Wtb
         nextWordProb = C.softmax(preSoftmax)
         bestTrans = C.reshape(C.argmax(nextWordProb, -1), shape=(Config.BatchSize))
         return bestTrans
 
-    def createTestingDecoderNetwork(self, srcHiddenStates, decoderPreWord, decoderPreHidden, srcLength):
-        srcHiddenStates = C.reshape(srcHiddenStates, shape=(srcLength, Config.BatchSize, Config.SrcHiddenSize*2))
-        contextVect = self.createAttentionNet(srcHiddenStates, decoderPreHidden, srcLength)
-        preWord = self.EmbTrg(decoderPreWord )
-        curInput = C.splice(contextVect, preWord, axis=2)
-        (networkHiddenTrg, networkMemTrg) = self.Decoder.createNetwork(curInput, decoderPreHidden)
-        return  networkHiddenTrg
+
 
     def saveModel(self, filename):
         print("Saving model " + filename)

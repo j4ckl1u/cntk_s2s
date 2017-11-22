@@ -1,6 +1,8 @@
 import Config
 import re
 from random import shuffle
+import cntk as C
+import numpy as np
 
 class Vocabulary:
 
@@ -59,6 +61,9 @@ class Vocabulary:
 
     def getIDList(self, words):
         return [self.getID(word) for word in words]
+
+    def getEndId(self):
+        return self.getID("</s>")
 
 class MonoCorpus:
 
@@ -125,19 +130,36 @@ class MonoCorpus:
         return sentences
 
     def getEndId(self):
-        return self.vocab.getID("</s>")
+        return self.vocab.getEndId()
+
+    @staticmethod
+    def buildInputMono(sentences, vocabSize, maxLength, endID):
+        sent = []
+        for i in range(0, maxLength, 1):
+            for j in range(0, Config.BatchSize, 1):
+                if (j < len(sentences) and i < len(sentences[j])):
+                    sent.append(sentences[j][i])
+                else:
+                    sent.append(endID)
+        batch = C.Value.one_hot(sent, vocabSize)
+
+        batchMask = np.zeros((maxLength, Config.BatchSize), dtype=np.float32)
+        for i in range(0, len(sentences), 1):
+            sentence = sentences[i]
+            lastIndex = len(sentence) if len(sentence) < maxLength else maxLength
+            batchMask[0:lastIndex, i] = 1
+
+        return (batch, batchMask)
 
 class BiCorpus:
 
-    def __init__(self, srcVocabF, trgVocabF, srcF, trgF, shuffle = False):
-        self.srcVocab = Vocabulary()
-        self.trgVocab = Vocabulary()
+    def __init__(self, srcVocab, trgVocab, srcF, trgF, shuffle = False):
+        self.srcVocab = srcVocab
+        self.trgVocab = trgVocab
         self.sentencePairs = []
         self.batchPool = []
         self.batchId = 0
         self.curSent = 0
-        self.srcVocab.loadDict(srcVocabF)
-        self.trgVocab.loadDict(trgVocabF)
         self.needShuffle = shuffle
         self.loadData(srcF, trgF)
 
@@ -209,7 +231,56 @@ class BiCorpus:
 
     def getEndId(self, source=True):
         if(source):
-            return self.srcVocab.getID("</s>")
+            return self.srcVocab.getEndId()
         else:
-            return self.trgVocab.getID("</s>")
+            return self.trgVocab.getEndId()
 
+    def buildInput(self, sentences):
+        (batchSrc, batchSrcMask) = MonoCorpus.buildInputMono([pair[0] for pair in sentences], Config.SrcVocabSize, Config.SrcMaxLength, self.getEndId(True))
+        (batchTrg, batchTrgMask) = MonoCorpus.buildInputMono([pair[1] for pair in sentences], Config.SrcVocabSize, Config.SrcMaxLength, self.getEndId(False))
+        return (batchSrc, batchTrg, batchSrcMask, batchTrgMask)
+
+class ValCorpus:
+
+    def __init__(self, srcVocab, trgVocab, valFile, nRef):
+        self.srcVocab = srcVocab
+        self.trgVocab = trgVocab
+        self.sentencePairs = []
+        self.nRef = nRef
+        self.curSent = 0
+        self.needShuffle = shuffle
+        self.loadData(valFile)
+
+    def loadData(self, valFile):
+        print("Loading data " + valFile)
+        sentences = []
+        f = open(valFile)
+        line = f.readline()
+        while line:
+            line = line.strip()
+            words = re.split("\s+", line)
+            src = self.srcVocab.getIDList(words)
+            line = f.readline()
+            trgs = []
+            for refi in range(0, self.nRef, 1):
+                line = f.readline()
+                line = line.strip() + " </s>"
+                words = re.split("\s+", line)
+                trgS = self.trgVocab.getIDList(words)
+                trgs.append(trgS)
+            self.sentencePairs.append((src, trgs))
+            line = f.readline()
+        f.close()
+
+
+    def getValBatch(self, num=Config.BatchSize):
+        if (self.curSent >= len(self.sentencePairs) - 1):
+            self.curSent = 0
+            return None
+        sentences = []
+        for i in range(0, num, 1):
+            if(self.curSent + i >= len(self.sentencePairs)): break
+            sentence = self.sentencePairs[self.curSent + i]
+            sentences.append(sentence)
+        self.curSent += len(sentences)
+        return sentences
