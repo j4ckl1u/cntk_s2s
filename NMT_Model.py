@@ -28,7 +28,7 @@ class NMT_Model:
         self.Parameters.extend(self.EncoderR2L.Parameters)
         self.Parameters.extend(self.Decoder.Parameters)
 
-    def createEncoderNetwork(self, srcLength):
+    def createEncoderNetwork(self, inputMatrixSrc, srcLength):
         networkHiddenSrcL2R = {}
         networkHiddenSrcR2L = {}
         inputSrc = C.reshape(self.inputMatrixSrc, shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcVocabSize))
