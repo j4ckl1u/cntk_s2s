@@ -47,7 +47,7 @@ class GRUN:
         self.Ub = C.parameter(shape=(hiddenSize*3), init=Config.defaultInit())
         self.Parameters = [self.W, self.Wb, self.U, self.Ub]
 
-    def createNetwork(self, inputEmb, preHidden, preMem=None):
+    def createNetwork(self, inputEmb, preHidden):
         WX = C.times(inputEmb, self.W) + self.Wb
         UH = C.times(preHidden, self.U) + self.Ub
 
@@ -58,7 +58,7 @@ class GRUN:
         HTilde = C.tanh(C.slice(WX, -1, self.hiddenSize*2, self.hiddenSize*3) + UHR)
 
         CurH = C.element_times(HTilde, 1-Z) + C.element_times(preHidden, Z)
-        return (CurH, None)
+        return CurH
 
 class LSTM:
 

@@ -6,11 +6,10 @@ import  numpy as np
 class NMT_Model:
 
     def __init__(self):
-        RNNCell = RNN.GRUN if not Config.UseLSTM else RNN.LSTM
         self.EmbSrc = C.layers.Embedding(Config.EmbeddingSize, init=Config.defaultInit())
         self.EmbTrg = C.layers.Embedding(Config.EmbeddingSize, init=Config.defaultInit())
-        self.EncoderL2R = RNNCell(Config.EmbeddingSize, Config.SrcHiddenSize)
-        self.EncoderR2L = RNNCell(Config.EmbeddingSize, Config.SrcHiddenSize)
+        self.EncoderL2R = RNN.GRUN(Config.EmbeddingSize, Config.SrcHiddenSize)
+        self.EncoderR2L = RNN.GRUN(Config.EmbeddingSize, Config.SrcHiddenSize)
         self.Decoder = RNN.GRUN(Config.EmbeddingSize + Config.SrcHiddenSize * 2, Config.TrgHiddenSize)
         self.Wt = C.parameter(shape=(Config.TrgHiddenSize, Config.TrgVocabSize), init=Config.defaultInit())
         self.Wtb = C.parameter(shape=(Config.TrgVocabSize), init=Config.defaultInit())
@@ -32,31 +31,24 @@ class NMT_Model:
     def createEncoderNetwork(self, srcLength):
         networkHiddenSrcL2R = {}
         networkHiddenSrcR2L = {}
-        networkMemSrcL2R = {}
-        networkMemSrcR2L = {}
         inputSrc = C.reshape(self.inputMatrixSrc, shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcVocabSize))
         for i in range(0, srcLength, 1):
-            (networkHiddenSrcL2R[i], networkMemSrcL2R[i]) = \
-                self.EncoderL2R.createNetwork(self.EmbSrc(inputSrc[i]),
-                                              self.firstHidden if i == 0 else networkHiddenSrcL2R[i-1],
-                                              self.firstHidden if i == 0 else networkMemSrcL2R[i-1])
+            networkHiddenSrcL2R[i]= self.EncoderL2R.createNetwork(self.EmbSrc(inputSrc[i]),
+                                              self.firstHidden if i == 0 else networkHiddenSrcL2R[i-1])
 
-            (networkHiddenSrcR2L[srcLength-i-1], networkMemSrcR2L[srcLength-i-1]) = \
-                self.EncoderR2L.createNetwork(self.EmbSrc(inputSrc[srcLength-i-1]),
-                                              self.firstHidden if i == 0 else networkHiddenSrcR2L[srcLength-i],
-                                              self.firstHidden if i == 0 else networkMemSrcR2L[srcLength-i])
-
+            networkHiddenSrcR2L[srcLength-i-1]= self.EncoderR2L.createNetwork(self.EmbSrc(inputSrc[srcLength-i-1]),
+                                              self.firstHidden if i == 0 else networkHiddenSrcR2L[srcLength-i])
 
         networkHiddenSrc = []
         for i in range(0, srcLength, 1):
-            networkHiddenSrc.append(C.splice(networkHiddenSrcL2R[i], networkHiddenSrcR2L[i], axis=2))
+            networkHiddenSrc.append(C.splice(networkHiddenSrcL2R[i], networkHiddenSrcR2L[i], axis=-1))
         if(srcLength > 1):
             sourceHidden = C.splice(networkHiddenSrc[0], networkHiddenSrc[1], axis=0)
             for i in range(2, srcLength, 1):
                 sourceHidden = C.splice(sourceHidden, networkHiddenSrc[i], axis=0)
         else:
             sourceHidden = C.reshape(networkHiddenSrc[0], shape=(1, Config.BatchSize, Config.SrcHiddenSize*2))
-        return (sourceHidden, networkHiddenSrcR2L[0])
+        return sourceHidden
 
     def createDecoderInitNetwork(self, srcLastHidden):
         WIS = C.times(srcLastHidden, self.WI) + self.WIb
@@ -76,13 +68,15 @@ class NMT_Model:
         contextVector =C.reduce_sum(C.reshape(attVector, shape=(srcLength, Config.BatchSize * srcHiddenSize)), axis=0)
         return C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
 
-    def createDecoderNetwork(self, networkHiddenSrc, sourceLastHidden, srcLength, trgLength):
+    def createDecoderNetwork(self, networkHiddenSrc, srcLength, trgLength):
+        timeZeroHidden = C.slice(networkHiddenSrc, 0, 0, 1)
+        sentEmb = C.slice(timeZeroHidden, -1, Config.SrcHiddenSize, Config.SrcHiddenSize*2)
         networkHiddenTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
         tce = 0
-        for i in range(0, trgLength-1, 1):
+        for i in range(0, trgLength, 1):
             if (i == 0):
-                networkHiddenTrg[i] = self.createDecoderInitNetwork(sourceLastHidden)
+                networkHiddenTrg[i] = self.createDecoderInitNetwork(sentEmb)
             else:
                 contextVect = self.createAttentionNet(networkHiddenSrc, networkHiddenTrg[i - 1], srcLength)
                 curWord = self.EmbTrg(inputTrg[i])
@@ -90,14 +84,14 @@ class NMT_Model:
                 networkHiddenTrg[i] = self.Decoder.createNetwork(curInput, networkHiddenTrg[i - 1])[0]
 
             preSoftmax = C.times(networkHiddenTrg[i], self.Wt) + self.Wtb
-            ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i + 1], 2)
+            ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i], 2)
             tce += C.times(C.reshape(ce, shape=(1, Config.BatchSize)),
                            C.reshape(self.maskMatrixTrg[i], shape=(Config.BatchSize, 1)))
         return tce
 
     def createNetwork(self, srcLength, trgLength):
-        (networkHiddenSrc, sourceLastHidden) = self.createEncoderNetwork(srcLength)
-        decoderNet = self.createDecoderNetwork(networkHiddenSrc, sourceLastHidden, srcLength, trgLength)
+        networkHiddenSrc = self.createEncoderNetwork(srcLength)
+        decoderNet = self.createDecoderNetwork(networkHiddenSrc, srcLength, trgLength)
         return decoderNet
 
     def createTestingDecoderInitNetwork(self, srcSentEmb):
