@@ -105,20 +105,20 @@ class MonoCorpus:
     def getSentences(self, num):
         sentences = []
         for i in range(0, num, 1):
-            if(self.curSent + i >= len(self.sentences)-1): self.reset()
+            if(self.curSent>= len(self.sentences)): self.reset()
             sentence = self.sentences[self.curSent + i]
             sentences.append(sentence)
-        self.curSent += len(sentences)
+            self.curSent += 1
         return sentences
 
     def getTrainBatch(self):
-        if(self.batchId >= len(self.batchPool) -1): self.buildBatchPool()
+        if(self.batchId >= len(self.batchPool)): self.buildBatchPool()
         rBatch = self.batchPool[self.batchId]
         self.batchId += 1
         return rBatch
 
     def getValBatch(self, num=Config.BatchSize):
-        if (self.curSent >= len(self.sentences) - 1):
+        if (self.curSent >= len(self.sentences)):
             self.curSent = 0
             return None
         sentences = []
@@ -184,7 +184,7 @@ class BiCorpus:
 
     def buildBatchPool(self):
         batchPool = []
-        sentences = self.getSentences(Config.BatchSize * 100)
+        sentences = self.getSentences(Config.BatchSize * 1)
         sentences = sorted(sentences, key=lambda sent : len(sent[1]))
         self.batchPool = [sentences[x:x + Config.BatchSize] for x in xrange(0, len(sentences), Config.BatchSize)]
         shuffle(self.batchPool)
@@ -197,10 +197,10 @@ class BiCorpus:
     def getSentences(self, num):
         sentences = []
         for i in range(0, num, 1):
-            if(self.curSent + i >= len(self.sentencePairs)-1): self.reset()
-            sentence = self.sentencePairs[self.curSent + i]
+            if(self.curSent >= len(self.sentencePairs)): self.reset()
+            sentence = self.sentencePairs[self.curSent]
             sentences.append(sentence)
-        self.curSent += len(sentences)
+            self.curSent += 1
         return sentences
 
     def iD2SentPairs(self, idsPair):
@@ -212,13 +212,13 @@ class BiCorpus:
         return self.srcVocab.getWordList(ids) if src else self.trgVocab.getWordList(ids)
 
     def getTrainBatch(self):
-        if(self.batchId >= len(self.batchPool) -1): self.buildBatchPool()
+        if(self.batchId >= len(self.batchPool)): self.buildBatchPool()
         rBatch = self.batchPool[self.batchId]
         self.batchId += 1
         return rBatch
 
     def getValBatch(self, num=Config.BatchSize):
-        if (self.curSent >= len(self.sentencePairs) - 1):
+        if (self.curSent >= len(self.sentencePairs)):
             self.curSent = 0
             return None
         sentences = []
@@ -274,7 +274,7 @@ class ValCorpus:
 
 
     def getValBatch(self, num=Config.BatchSize):
-        if (self.curSent >= len(self.sentencePairs) - 1):
+        if (self.curSent >= len(self.sentencePairs)):
             self.curSent = 0
             return None
         sentences = []

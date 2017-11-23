@@ -62,7 +62,7 @@ class NMT_Model:
         hst = C.reshape(hsw, shape=(srcLength, Config.BatchSize * Config.TrgHiddenSize)) + C.reshape(htw, shape=(1, Config.BatchSize * Config.TrgHiddenSize))
         hstT = C.reshape(C.tanh(hst), shape=(srcLength * Config.BatchSize, Config.TrgHiddenSize))
         attScore = C.reshape(C.times(hstT, self.Wav), shape=(srcLength, Config.BatchSize))
-        maskOut = (C.slice(self.maskMatrixSrc, 0, 0, srcLength) -1)*999999
+        maskOut = (C.slice(self.maskMatrixSrc, 0, 0, srcLength) -1)*99999999
         nAttScore = attScore + maskOut
         attProb = C.reshape(C.softmax(nAttScore, axis=0),shape=(srcLength, Config.BatchSize, 1))
         attVector =hiddenSrc*attProb
@@ -112,14 +112,18 @@ class NMT_Model:
         bestTrans = C.reshape(C.argmax(nextWordProb, -1), shape=(Config.BatchSize))
         return bestTrans
 
-    def createDecodingNetworks(self, srcSentEmb, srcHiddenStates, trgWord, trgHidden, srcLength):
-        encoderNet = self.createEncoderNetwork(srcLength)
+    def createDecodingInitNetwork(self, srcSentEmb):
         decoderInitHidden = self.createDecoderInitNetwork(srcSentEmb)
-        decoderInitPredictNet = self.createPredictionNetwork(trgHidden, self.initTrgEmb)
-        preTrgEmb = self.EmbTrg(trgWord)
-        decoderNet = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), preTrgEmb, trgHidden, srcLength)
-        predictNet = self.createPredictionNetwork(trgHidden, preTrgEmb)
-        return (encoderNet, decoderInitHidden, decoderInitPredictNet, decoderNet, predictNet)
+        decoderInitPredict = self.createPredictionNetwork(decoderInitHidden, self.initTrgEmb)
+        decoderInitPredictNet= C.combine(decoderInitHidden, decoderInitPredict)
+        return (decoderInitPredictNet, [decoderInitHidden.output, decoderInitPredict.output])
+
+    def createDecodingNetworks(self, srcHiddenStates, trgPreWord, trgPreHidden, srcLength):
+        preTrgEmb = self.EmbTrg(trgPreWord)
+        decoderHidden = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), preTrgEmb, trgPreHidden, srcLength)
+        decoderPredict = self.createPredictionNetwork(decoderHidden, preTrgEmb)
+        decoderPredictNet=C.combine(decoderHidden, decoderPredict)
+        return (decoderPredictNet, [decoderHidden.output, decoderPredict.output])
 
     def saveModel(self, filename):
         print("Saving model " + filename)

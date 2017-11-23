@@ -13,18 +13,20 @@ class NMT_Decoder:
         self.model = model
         self.srcVocab = srcVocab
         self.trgVocab = trgVocab
-        self.networkBucket = {}
         self.srcHiddenStatesMem = np.zeros(shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcHiddenSize * 2), dtype=np.float32)
         self.srcSentEmbMem = np.zeros(shape=(1, Config.BatchSize, Config.SrcHiddenSize), dtype=np.float32)
         self.srcHiddenStates = C.input_variable(shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcHiddenSize * 2))
         self.srcSentEmb = C.input_variable(shape=(Config.BatchSize, Config.SrcHiddenSize))
-        self.trgHidden = C.input_variable(shape=(Config.BatchSize, Config.TrgHiddenSize))
-        self.trgWord = C.input_variable(shape=(Config.BatchSize, Config.TrgVocabSize), is_sparse=True)
+        self.trgPreHidden = C.input_variable(shape=(Config.BatchSize, Config.TrgHiddenSize))
+        self.trgPreWord = C.input_variable(shape=(Config.BatchSize, Config.TrgVocabSize), is_sparse=True)
+        self.networkBucket = {}
+        self.decoderInitNetwork = self.model.createDecodingInitNetwork(self.srcSentEmb)
 
     def getDecodingNetwork(self, srcLength):
         if(not self.networkBucket.has_key(srcLength)):
-            self.networkBucket[srcLength] = self.model.createDecodingNetworks(self.srcSentEmb, self.srcHiddenStates,
-                                                                              self.trgWord, self.trgHidden, srcLength)
+            decoderNetwork= self.model.createDecodingNetworks(self.srcHiddenStates, self.trgPreWord, self.trgPreHidden, srcLength)
+            encoderNetwork = self.model.createEncoderNetwork(srcLength)
+            self.networkBucket[srcLength]=[encoderNetwork, decoderNetwork]
         return self.networkBucket[srcLength]
 
     def runEncoderNetwork(self, sourceHiddenNet, batchSrc, maxSrcLength):
@@ -39,27 +41,29 @@ class NMT_Decoder:
         transCands = []
         sentEndID = self.trgVocab.getEndId()
         maxSrcLength = max(len(x) for x in srcWords)
-        (encoderNetwork, decoderInitHidden, decoderInitPredictNet, decoderNet, predictNet) = \
-            self.getDecodingNetwork(maxSrcLength)
+        [encoderNetwork, decoderNetwork] =  self.getDecodingNetwork(maxSrcLength)
 
         (batchSrc, batchSrcMask) = Corpus.MonoCorpus.buildInputMono(srcWords, Config.SrcVocabSize, Config.SrcMaxLength,
                                                                     self.srcVocab.getEndId())
         self.runEncoderNetwork(encoderNetwork, batchSrc, maxSrcLength)
 
-        decoderHidden = decoderInitHidden.eval({self.srcSentEmb: self.srcSentEmbMem})
-        trans = decoderInitPredictNet.eval({self.trgHidden: decoderHidden})
+        initPredict = self.decoderInitNetwork[0].eval({self.srcSentEmb: self.srcSentEmbMem})
+        decoderHidden = initPredict[self.decoderInitNetwork[1][0]]
+        trans = initPredict[self.decoderInitNetwork[1][1]]
 
-        while (np.all(trans != sentEndID) and count < Config.TrgMaxLength):
+        while (np.any(trans != sentEndID) and count < Config.TrgMaxLength):
 
             transList = [int(t) for t in trans.tolist()[0]]
             transCands.append(transList)
             count += 1
 
             preWords = C.Value.one_hot(transList, Config.TrgVocabSize)
-            decoderHidden = decoderNet.eval(
-                {self.srcHiddenStates: self.srcHiddenStatesMem, self.trgWord: preWords, self.trgHidden: decoderHidden,
+            decoderPredict = decoderNetwork[0].eval(
+                {self.srcHiddenStates: self.srcHiddenStatesMem, self.trgPreWord: preWords, self.trgPreHidden: decoderHidden,
                  self.model.maskMatrixSrc: batchSrcMask})
-            trans = predictNet.eval({self.trgHidden: decoderHidden, self.trgWord: preWords})
+
+            decoderHidden = decoderPredict[decoderNetwork[1][0]]
+            trans = decoderPredict[decoderNetwork[1][1]]
 
 
         transR = []
