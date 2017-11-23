@@ -68,7 +68,7 @@ class NMT_Trainer:
 
     def validateAndSaveModel(self, i, bestValScore):
         if (i % Config.ValiditionPerBatch == 0):
-            valScore = self.validate()
+            valScore = self.validateBLEU()
             if (valScore < bestValScore):
                 self.model.saveModel(Config.modelF + "." + str(i))
                 bestValScore = valScore

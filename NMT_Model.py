@@ -11,7 +11,7 @@ class NMT_Model:
         self.EncoderL2R = RNN.GRUN(Config.EmbeddingSize, Config.SrcHiddenSize)
         self.EncoderR2L = RNN.GRUN(Config.EmbeddingSize, Config.SrcHiddenSize)
         self.Decoder = RNN.GRUN(Config.EmbeddingSize + Config.SrcHiddenSize * 2, Config.TrgHiddenSize)
-        self.Wt = C.parameter(shape=(Config.TrgHiddenSize, Config.TrgVocabSize), init=Config.defaultInit())
+        self.Wt = C.parameter(shape=(Config.TrgHiddenSize + Config.EmbeddingSize, Config.TrgVocabSize), init=Config.defaultInit())
         self.Wtb = C.parameter(shape=(Config.TrgVocabSize), init=Config.defaultInit())
         self.WI = C.parameter(shape=(Config.SrcHiddenSize, Config.TrgHiddenSize), init=Config.defaultInit())
         self.WIb = C.parameter(shape=(Config.TrgHiddenSize), init=Config.defaultInit())
@@ -19,6 +19,7 @@ class NMT_Model:
         self.Wat = C.parameter(shape=(Config.TrgHiddenSize, Config.TrgHiddenSize), init=Config.defaultInit())
         self.Wav = C.parameter(shape=(Config.TrgHiddenSize, 1), init=Config.defaultInit())
         self.firstHidden = C.constant(0, shape=(Config.BatchSize, Config.SrcHiddenSize))
+        self.initTrgEmb = C.constant(0, shape=(1, Config.BatchSize, Config.EmbeddingSize))
         self.inputMatrixSrc = C.input_variable(shape=(Config.SrcMaxLength * Config.BatchSize, Config.SrcVocabSize), is_sparse=True)
         self.inputMatrixTrg = C.input_variable(shape=(Config.TrgMaxLength * Config.BatchSize, Config.TrgVocabSize), is_sparse=True)
         self.maskMatrixSrc = C.input_variable(shape=(Config.SrcMaxLength, Config.BatchSize))
@@ -68,10 +69,9 @@ class NMT_Model:
         contextVector =C.reduce_sum(C.reshape(attVector, shape=(srcLength, Config.BatchSize * srcHiddenSize)), axis=0)
         return C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
 
-    def createDecoderRNNNetwork(self, srcHiddenStates, preWord, preHidden, srcLength):
+    def createDecoderRNNNetwork(self, srcHiddenStates, preTrgEmb, preHidden, srcLength):
         contextVect = self.createAttentionNet(srcHiddenStates, preHidden, srcLength)
-        preWord = self.EmbTrg(preWord)
-        curInput = C.splice(contextVect, preWord, axis=-1)
+        curInput = C.splice(contextVect, preTrgEmb, axis=-1)
         networkHiddenTrg = self.Decoder.createNetwork(curInput, preHidden)
         return networkHiddenTrg
 
@@ -82,33 +82,44 @@ class NMT_Model:
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
         tce = 0
         for i in range(0, trgLength, 1):
+            
+            preTrgEmb = self.initTrgEmb if i==0 else self.EmbTrg(inputTrg[i-1])
+            
             if (i == 0):
                 networkHiddenTrg[i] = self.createDecoderInitNetwork(srcSentEmb)
             else:
-                networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, inputTrg[i-1], networkHiddenTrg[i - 1], srcLength)
+                networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, preTrgEmb , networkHiddenTrg[i - 1], srcLength)
 
-            preSoftmax = C.times(networkHiddenTrg[i], self.Wt) + self.Wtb
+            preSoftmax = self.createReadOutNetwork(networkHiddenTrg[i],  preTrgEmb)
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i], 2)
             tce += C.times_transpose(C.reshape(ce, shape=(1, Config.BatchSize)), self.maskMatrixTrg[i])
+            
         return tce
+
+    def createReadOutNetwork(self, decoderHidden, preTrgEmb):
+        readOut = C.splice(decoderHidden, preTrgEmb, axis=-1)
+        preSoftmax = C.times(readOut, self.Wt) + self.Wtb
+        return preSoftmax
 
     def createTrainingNetwork(self, srcLength, trgLength):
         networkHiddenSrc = self.createEncoderNetwork(srcLength)
         decoderNet = self.createDecoderNetwork(networkHiddenSrc, srcLength, trgLength)
         return decoderNet
 
-    def createPredictionNetwork(self, decoderHidden):
-        preSoftmax = C.times(decoderHidden, self.Wt) + self.Wtb
+    def createPredictionNetwork(self, decoderHidden, preTrgEmb):
+        preSoftmax = self.createReadOutNetwork(decoderHidden, preTrgEmb)
         nextWordProb = C.softmax(preSoftmax)
         bestTrans = C.reshape(C.argmax(nextWordProb, -1), shape=(Config.BatchSize))
         return bestTrans
 
-    def createDecodingNetworks(self, srcSentEmb, srcHiddenStates, decoderPreWord, decoderPreHidden, srcLength):
-        sourceHiddenNet = self.createEncoderNetwork(srcLength)
-        decoderInitNet = self.createDecoderInitNetwork(srcSentEmb)
-        decoderNet = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), decoderPreWord, decoderPreHidden, srcLength)
-        predictNet = self.createPredictionNetwork(decoderPreHidden)
-        return (sourceHiddenNet, decoderInitNet, decoderNet, predictNet)
+    def createDecodingNetworks(self, srcSentEmb, srcHiddenStates, trgWord, trgHidden, srcLength):
+        encoderNet = self.createEncoderNetwork(srcLength)
+        decoderInitHidden = self.createDecoderInitNetwork(srcSentEmb)
+        decoderInitPredictNet = self.createPredictionNetwork(trgHidden, self.initTrgEmb)
+        preTrgEmb = self.EmbTrg(trgWord)
+        decoderNet = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), preTrgEmb, trgHidden, srcLength)
+        predictNet = self.createPredictionNetwork(trgHidden, preTrgEmb)
+        return (encoderNet, decoderInitHidden, decoderInitPredictNet, decoderNet, predictNet)
 
     def saveModel(self, filename):
         print("Saving model " + filename)
