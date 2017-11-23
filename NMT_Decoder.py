@@ -21,23 +21,15 @@ class NMT_Decoder:
         self.decoderPreHidden = C.input_variable(shape=(Config.BatchSize, Config.TrgHiddenSize))
         self.decoderPreWord = C.input_variable(shape=(Config.BatchSize, Config.TrgVocabSize), is_sparse=True)
 
-
-    def createDecodingNetworks(self, srcLength):
-        sourceHiddenNet = self.model.createEncoderNetwork(srcLength)
-        decoderInitNet = self.model.createDecoderInitNetwork(self.srcSentEmb)
-        decoderNet = self.model.createDecoderRNNNetwork(C.slice(self.srcHiddenStates, 0, 0, srcLength), self.decoderPreWord, self.decoderPreHidden, srcLength)
-        predictNet = self.model.createPredictionNetwork(self.decoderPreHidden)
-        return (sourceHiddenNet, decoderInitNet, decoderNet, predictNet)
-
     def getDecodingNetwork(self, srcLength):
         if(not self.networkBucket.has_key(srcLength)):
-            self.networkBucket[srcLength] = self.createDecodingNetworks(srcLength)
+            self.networkBucket[srcLength] = self.model.createDecodingNetworks(self.srcSentEmb, self.srcHiddenStates,
+                                                                              self.decoderPreWord, self.decoderPreHidden, srcLength)
         return self.networkBucket[srcLength]
 
     def greedyDecoding(self, src):
         maxSrcLength = max(len(x) for x in src)
         (sourceHiddenNet, decoderInitNet, decoderNet, predictNet) = self.getDecodingNetwork(maxSrcLength)
-        #(sourceHiddenNet, decoderInitNet, decoderNet, predictNet) = (decodingNets[0], decodingNets[1], decodingNets[2], decodingNets[3])
         (batchSrc, batchSrcMask) = Corpus.MonoCorpus.buildInputMono(src, Config.SrcVocabSize, Config.SrcMaxLength, self.srcVocab.getEndId())
         sourceHiddens = sourceHiddenNet.eval({self.model.inputMatrixSrc: batchSrc})
         sourceHiddens = sourceHiddens.reshape(maxSrcLength, Config.BatchSize, Config.SrcHiddenSize * 2)

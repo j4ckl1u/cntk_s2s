@@ -26,8 +26,7 @@ class LM_Model:
                 networkHiddenTrg[i] = self.firstHidden
                 networkMemTrg[i] = networkHiddenTrg[i]
             else:
-                curWord = self.Emb(inputTrg[i])
-                (networkHiddenTrg[i], networkMemTrg[i]) = self.Decoder.createNetwork(curWord, networkHiddenTrg[i - 1], networkMemTrg[i-1])
+                (networkHiddenTrg[i], networkMemTrg[i]) = self.Decoder.createNetwork(self.Emb(inputTrg[i]), networkHiddenTrg[i - 1], networkMemTrg[i-1])
 
             preSoftmax = C.times(networkHiddenTrg[i], self.Wt) + self.Wtb
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i + 1], 2)

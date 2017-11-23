@@ -37,7 +37,7 @@ class NMT_Trainer:
         networkTrgid = networkTrgid if networkTrgid <= Config.TrgMaxLength else Config.TrgMaxLength
         if(not self.networkBucket.has_key((networkSrcid, networkTrgid))):
             print("Creating network (" + str(networkSrcid) + "," + str(networkTrgid) + ")", end="\r")
-            self.networkBucket[(networkSrcid, networkTrgid)] = self.model.createNetwork(networkSrcid, networkTrgid)
+            self.networkBucket[(networkSrcid, networkTrgid)] = self.model.createTrainingNetwork(networkSrcid, networkTrgid)
             print("Bucket contains networks for ", end="")
             for key in self.networkBucket: print("(" + str(key[0]) + "," + str(key[1]) + ")", end=" ")
             print()
@@ -68,7 +68,7 @@ class NMT_Trainer:
 
     def validateAndSaveModel(self, i, bestValScore):
         if (i % Config.ValiditionPerBatch == 0):
-            valScore = self.validateBLEU()
+            valScore = self.validate()
             if (valScore < bestValScore):
                 self.model.saveModel(Config.modelF + "." + str(i))
                 bestValScore = valScore
@@ -100,7 +100,7 @@ class NMT_Trainer:
             ceAll += ce
             valBatch = self.valData.getValBatch()
         cePerWord = ceAll/countAll
-        print("Validation Cross Entropy :" + str(cePerWord))
+        print("Validation Cross Entropy :" + str(cePerWord/math.log(2.0)))
         return cePerWord
 
 
@@ -114,6 +114,7 @@ class NMT_Trainer:
             srcIds = [pair[0] for pair in valBatch]
             transIDs = self.decoder.greedyDecoding(srcIds)
             src = [self.trainData.iD2Sent(srcId, True) for srcId in srcIds]
+            #golden = [[self.trainData.iD2Sent(pair[1], False)] for pair in valBatch]
             golden = [[self.trainData.iD2Sent(ref, False) for ref in pair[1]] for pair in valBatch]
             trans = [self.trainData.iD2Sent(tran, False) for tran in transIDs]
             valSrc.extend(src)

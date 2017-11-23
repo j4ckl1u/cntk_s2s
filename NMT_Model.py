@@ -85,14 +85,14 @@ class NMT_Model:
             if (i == 0):
                 networkHiddenTrg[i] = self.createDecoderInitNetwork(srcSentEmb)
             else:
-                networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, inputTrg[i], networkHiddenTrg[i - 1], srcLength)
+                networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, inputTrg[i-1], networkHiddenTrg[i - 1], srcLength)
 
             preSoftmax = C.times(networkHiddenTrg[i], self.Wt) + self.Wtb
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i], 2)
             tce += C.times_transpose(C.reshape(ce, shape=(1, Config.BatchSize)), self.maskMatrixTrg[i])
         return tce
 
-    def createNetwork(self, srcLength, trgLength):
+    def createTrainingNetwork(self, srcLength, trgLength):
         networkHiddenSrc = self.createEncoderNetwork(srcLength)
         decoderNet = self.createDecoderNetwork(networkHiddenSrc, srcLength, trgLength)
         return decoderNet
@@ -103,7 +103,12 @@ class NMT_Model:
         bestTrans = C.reshape(C.argmax(nextWordProb, -1), shape=(Config.BatchSize))
         return bestTrans
 
-
+    def createDecodingNetworks(self, srcSentEmb, srcHiddenStates, decoderPreWord, decoderPreHidden, srcLength):
+        sourceHiddenNet = self.createEncoderNetwork(srcLength)
+        decoderInitNet = self.createDecoderInitNetwork(srcSentEmb)
+        decoderNet = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), decoderPreWord, decoderPreHidden, srcLength)
+        predictNet = self.createPredictionNetwork(decoderPreHidden)
+        return (sourceHiddenNet, decoderInitNet, decoderNet, predictNet)
 
     def saveModel(self, filename):
         print("Saving model " + filename)
