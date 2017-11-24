@@ -1,10 +1,8 @@
 from __future__ import print_function
-import os
 import cntk as C
 import numpy as np
-import math
+import numpy
 import Config
-import NMT_Model
 import Corpus
 
 class NMT_Decoder:
@@ -29,12 +27,22 @@ class NMT_Decoder:
             self.networkBucket[srcLength]=[encoderNetwork, decoderNetwork]
         return self.networkBucket[srcLength]
 
-    def runEncoderNetwork(self, sourceHiddenNet, batchSrc, maxSrcLength):
-        sourceHiddens = sourceHiddenNet.eval({self.model.inputMatrixSrc: batchSrc})
+    def runEncoderNetwork(self, sourceHiddenNet, batchSrc, batchSrcMask, maxSrcLength):
+        sourceHiddens = sourceHiddenNet.eval({self.model.inputMatrixSrc: batchSrc, self.model.maskMatrixSrc:batchSrcMask})
         sourceHiddens = sourceHiddens.reshape(maxSrcLength, Config.BatchSize, Config.SrcHiddenSize * 2)
         self.srcSentEmbMem[:, :, :] = sourceHiddens[0:1, :, Config.SrcHiddenSize:Config.SrcHiddenSize * 2]
         self.srcHiddenStatesMem[0:maxSrcLength, :, :] = sourceHiddens
 
+
+    def buildTrgForDebug(self, sentences, maxLength,endID):
+        sent = []
+        for i in range(0, maxLength, 1):
+            for j in range(0, Config.BatchSize, 1):
+                if (j < len(sentences) and i < len(sentences[j])):
+                    sent.append(sentences[j][i])
+                else:
+                    sent.append(endID)
+        return sent
 
     def greedyDecoding(self, srcWords):
         count = 0
@@ -45,12 +53,14 @@ class NMT_Decoder:
 
         (batchSrc, batchSrcMask) = Corpus.MonoCorpus.buildInputMono(srcWords, Config.SrcVocabSize, Config.SrcMaxLength,
                                                                     self.srcVocab.getEndId())
-        self.runEncoderNetwork(encoderNetwork, batchSrc, maxSrcLength)
+        self.runEncoderNetwork(encoderNetwork, batchSrc, batchSrcMask, maxSrcLength)
 
         initPredict = self.decoderInitNetwork[0].eval({self.srcSentEmb: self.srcSentEmbMem})
         decoderHidden = initPredict[self.decoderInitNetwork[1][0]]
+        #preSoftmax = initPredict[self.decoderInitNetwork[1][1]]
         trans = initPredict[self.decoderInitNetwork[1][1]]
-
+        #numpy.savetxt("encoder.txt0" , preSoftmax.reshape(preSoftmax.shape[0] * preSoftmax.shape[1],
+        #                                                  preSoftmax.shape[2]*preSoftmax.shape[3]), fmt='%.5e')
         while (np.any(trans != sentEndID) and count < Config.TrgMaxLength):
 
             transList = [int(t) for t in trans.tolist()[0]]
@@ -63,8 +73,10 @@ class NMT_Decoder:
                  self.model.maskMatrixSrc: batchSrcMask})
 
             decoderHidden = decoderPredict[decoderNetwork[1][0]]
+            #preSoftmax = decoderPredict[decoderNetwork[1][1]]
             trans = decoderPredict[decoderNetwork[1][1]]
-
+            #numpy.savetxt("encoder.txt" + str(i), preSoftmax.reshape(preSoftmax.shape[0] * preSoftmax.shape[1],
+            #                                                         preSoftmax.shape[2] * preSoftmax.shape[3]), fmt='%.5e')
 
         transR = []
         for i in range(0, len(srcWords), 1):

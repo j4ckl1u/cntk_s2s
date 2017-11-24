@@ -7,6 +7,7 @@ import NMT_Model
 import NMT_Decoder
 import Corpus
 import nltk
+import numpy
 
 class NMT_Trainer:
 
@@ -38,7 +39,7 @@ class NMT_Trainer:
         if(not self.networkBucket.has_key((networkSrcid, networkTrgid))):
             print("Creating network (" + str(networkSrcid) + "," + str(networkTrgid) + ")", end="\r")
             self.networkBucket[(networkSrcid, networkTrgid)] = self.model.createTrainingNetwork(networkSrcid, networkTrgid)
-            print("Bucket contains networks for ", end="")
+            print("Bucket contains " + str(len(self.networkBucket)) +" networks ", end="")
             for key in self.networkBucket: print("(" + str(key[0]) + "," + str(key[1]) + ")", end=" ")
             print()
         return self.networkBucket[(networkSrcid, networkTrgid)]
@@ -68,7 +69,7 @@ class NMT_Trainer:
 
     def validateAndSaveModel(self, i, bestValScore):
         if (i % Config.ValiditionPerBatch == 0):
-            valScore = self.validate()
+            valScore = self.validateBLEU()
             if (valScore < bestValScore):
                 self.model.saveModel(Config.modelF + "." + str(i))
                 bestValScore = valScore
@@ -105,22 +106,23 @@ class NMT_Trainer:
 
 
     def validateBLEU(self):
-        valBatch = self.valData.getValBatch()
+        valBatch = self.valBleuData.getValBatch()
         valSrc = []
         valTrgGolden=[]
         valTrgTrans=[]
         print("Validation ...", end="\r")
         while (valBatch):
             srcIds = [pair[0] for pair in valBatch]
+            trgIds = [pair[1] for pair in valBatch]
             transIDs = self.decoder.greedyDecoding(srcIds)
             src = [self.trainData.iD2Sent(srcId, True) for srcId in srcIds]
-            golden = [[self.trainData.iD2Sent(pair[1], False)] for pair in valBatch]
-            #golden = [[self.trainData.iD2Sent(ref, False) for ref in pair[1]] for pair in valBatch]
+            #golden = [self.trainData.iD2Sent(trgId, False) for trgId in trgIds]
+            golden = [[self.trainData.iD2Sent(ref, False) for ref in pair[1]] for pair in valBatch]
             trans = [self.trainData.iD2Sent(tran, False) for tran in transIDs]
             valSrc.extend(src)
             valTrgGolden.extend(golden)
             valTrgTrans.extend(trans)
-            valBatch = self.valData.getValBatch()
+            valBatch = self.valBleuData.getValBatch()
         bleu = -self.computeBleu(valTrgTrans, valTrgGolden)
         print("Validation BLEU Score :" + str(bleu))
         return bleu
@@ -133,3 +135,5 @@ if __name__ == '__main__':
     C.device.try_set_default_device(C.device.gpu(Config.GPUID))
     nmtTrainer = NMT_Trainer()
     nmtTrainer.train()
+
+

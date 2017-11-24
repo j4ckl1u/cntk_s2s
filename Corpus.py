@@ -257,6 +257,7 @@ class ValCorpus:
         f = open(valFile)
         line = f.readline()
         while line:
+            line = line.split("||||")[0]
             line = line.strip()
             words = re.split("\s+", line)
             src = self.srcVocab.getIDList(words)
@@ -272,7 +273,6 @@ class ValCorpus:
             line = f.readline()
         f.close()
 
-
     def getValBatch(self, num=Config.BatchSize):
         if (self.curSent >= len(self.sentencePairs)):
             self.curSent = 0
@@ -284,3 +284,26 @@ class ValCorpus:
             sentences.append(sentence)
         self.curSent += len(sentences)
         return sentences
+
+    @staticmethod
+    def splitFile(valFile, srcFile, trgFile, nRef):
+        sentences = []
+        f = open(valFile)
+        fSrc = open(srcFile, "w")
+        fTrg = open(trgFile, "w")
+        line = f.readline()
+        while line:
+            line = line.split("||||")[0]
+            line = line.strip()
+            fSrc.write(line+ "\n")
+            line = f.readline()
+            trgs = []
+            for refi in range(0, nRef, 1):
+                line = f.readline()
+                line = line.strip()
+                if(refi ==0 ):
+                    fTrg.write(line+ "\n")
+            line = f.readline()
+        f.close()
+        fSrc.close()
+        fTrg.close()

@@ -33,12 +33,12 @@ class NMT_Model:
         networkHiddenSrcL2R = {}
         networkHiddenSrcR2L = {}
         inputSrc = C.reshape(self.inputMatrixSrc, shape=(Config.SrcMaxLength, Config.BatchSize, Config.SrcVocabSize))
-        for i in range(0, srcLength, 1):
-            networkHiddenSrcL2R[i]= self.EncoderL2R.createNetwork(self.EmbSrc(inputSrc[i]),
-                                              self.firstHidden if i == 0 else networkHiddenSrcL2R[i-1])
 
-            networkHiddenSrcR2L[srcLength-i-1]= self.EncoderR2L.createNetwork(self.EmbSrc(inputSrc[srcLength-i-1]),
-                                              self.firstHidden if i == 0 else networkHiddenSrcR2L[srcLength-i])
+        for i in range(0, srcLength, 1):
+            preL2RHidden = self.firstHidden if i == 0 else networkHiddenSrcL2R[i-1] *C.reshape(self.maskMatrixSrc[i-1], shape=(1, Config.BatchSize, 1))
+            networkHiddenSrcL2R[i]= self.EncoderL2R.createNetwork(self.EmbSrc(inputSrc[i]), preL2RHidden )
+            preR2LHidden = self.firstHidden if i == 0 else networkHiddenSrcR2L[srcLength-i]*C.reshape(self.maskMatrixSrc[srcLength-i], shape=(1, Config.BatchSize, 1))
+            networkHiddenSrcR2L[srcLength-i-1]= self.EncoderR2L.createNetwork(self.EmbSrc(inputSrc[srcLength-i-1]), preR2LHidden)
 
         networkHiddenSrc = []
         for i in range(0, srcLength, 1):
@@ -80,6 +80,7 @@ class NMT_Model:
         srcSentEmb = C.slice(timeZeroHidden, -1, Config.SrcHiddenSize, Config.SrcHiddenSize*2)
         networkHiddenTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
+        #preSoftmaxAll=[]
         tce = 0
         for i in range(0, trgLength, 1):
             
@@ -91,8 +92,10 @@ class NMT_Model:
                 networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, preTrgEmb , networkHiddenTrg[i - 1], srcLength)
 
             preSoftmax = self.createReadOutNetwork(networkHiddenTrg[i],  preTrgEmb)
+            #preSoftmaxAll = preSoftmax if i == 0 else C.splice(preSoftmaxAll, preSoftmax, axis=0)
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i], 2)
-            tce += C.times_transpose(C.reshape(ce, shape=(1, Config.BatchSize)), self.maskMatrixTrg[i])
+            ce = C.reshape(ce, shape=(1, Config.BatchSize))
+            tce += C.times_transpose(ce, self.maskMatrixTrg[i])
             
         return tce
 
@@ -102,26 +105,27 @@ class NMT_Model:
         return preSoftmax
 
     def createTrainingNetwork(self, srcLength, trgLength):
-        networkHiddenSrc = self.createEncoderNetwork(srcLength)
-        decoderNet = self.createDecoderNetwork(networkHiddenSrc, srcLength, trgLength)
+        encoderNet = self.createEncoderNetwork(srcLength)
+        decoderNet = self.createDecoderNetwork(encoderNet, srcLength, trgLength)
         return decoderNet
 
-    def createPredictionNetwork(self, decoderHidden, preTrgEmb):
-        preSoftmax = self.createReadOutNetwork(decoderHidden, preTrgEmb)
+    def createPredictionNetwork(self, preSoftmax):
         nextWordProb = C.softmax(preSoftmax)
         bestTrans = C.reshape(C.argmax(nextWordProb, -1), shape=(Config.BatchSize))
         return bestTrans
 
     def createDecodingInitNetwork(self, srcSentEmb):
         decoderInitHidden = self.createDecoderInitNetwork(srcSentEmb)
-        decoderInitPredict = self.createPredictionNetwork(decoderInitHidden, self.initTrgEmb)
+        preSoftmax = self.createReadOutNetwork(decoderInitHidden, self.initTrgEmb)
+        decoderInitPredict = self.createPredictionNetwork(preSoftmax)
         decoderInitPredictNet= C.combine(decoderInitHidden, decoderInitPredict)
         return (decoderInitPredictNet, [decoderInitHidden.output, decoderInitPredict.output])
 
     def createDecodingNetworks(self, srcHiddenStates, trgPreWord, trgPreHidden, srcLength):
         preTrgEmb = self.EmbTrg(trgPreWord)
         decoderHidden = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), preTrgEmb, trgPreHidden, srcLength)
-        decoderPredict = self.createPredictionNetwork(decoderHidden, preTrgEmb)
+        preSoftmax = self.createReadOutNetwork(decoderHidden, preTrgEmb)
+        decoderPredict = self.createPredictionNetwork(preSoftmax)
         decoderPredictNet=C.combine(decoderHidden, decoderPredict)
         return (decoderPredictNet, [decoderHidden.output, decoderPredict.output])
 
