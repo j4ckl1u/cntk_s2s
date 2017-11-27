@@ -67,20 +67,22 @@ class NMT_Model:
         attProb = C.reshape(C.softmax(nAttScore, axis=0),shape=(srcLength, Config.BatchSize, 1))
         attVector =hiddenSrc*attProb
         contextVector =C.reduce_sum(C.reshape(attVector, shape=(srcLength, Config.BatchSize * srcHiddenSize)), axis=0)
-        return C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
+        contextVector= C.reshape(contextVector, shape=(1, Config.BatchSize, srcHiddenSize))
+
+        return (contextVector, attProb)
 
     def createDecoderRNNNetwork(self, srcHiddenStates, preTrgEmb, preHidden, srcLength):
-        contextVect = self.createAttentionNet(srcHiddenStates, preHidden, srcLength)
+        (contextVect, attProb) = self.createAttentionNet(srcHiddenStates, preHidden, srcLength)
         curInput = C.splice(contextVect, preTrgEmb, axis=-1)
         networkHiddenTrg = self.Decoder.createNetwork(curInput, preHidden)
-        return networkHiddenTrg
+        return (networkHiddenTrg, attProb)
 
     def createDecoderNetwork(self, networkHiddenSrc, srcLength, trgLength):
         timeZeroHidden = C.slice(networkHiddenSrc, 0, 0, 1)
         srcSentEmb = C.slice(timeZeroHidden, -1, Config.SrcHiddenSize, Config.SrcHiddenSize*2)
         networkHiddenTrg = {}
         inputTrg = C.reshape(self.inputMatrixTrg, shape=(Config.TrgMaxLength, Config.BatchSize, Config.TrgVocabSize))
-        #preSoftmaxAll=[]
+        attProbAll=[]
         tce = 0
         for i in range(0, trgLength, 1):
             
@@ -89,10 +91,10 @@ class NMT_Model:
             if (i == 0):
                 networkHiddenTrg[i] = self.createDecoderInitNetwork(srcSentEmb)
             else:
-                networkHiddenTrg[i] = self.createDecoderRNNNetwork(networkHiddenSrc, preTrgEmb , networkHiddenTrg[i - 1], srcLength)
+                (networkHiddenTrg[i], attProb) = self.createDecoderRNNNetwork(networkHiddenSrc, preTrgEmb , networkHiddenTrg[i - 1], srcLength)
+                attProbAll = attProb if i == 1 else C.splice(attProbAll, attProb, axis=0)
 
             preSoftmax = self.createReadOutNetwork(networkHiddenTrg[i],  preTrgEmb)
-            #preSoftmaxAll = preSoftmax if i == 0 else C.splice(preSoftmaxAll, preSoftmax, axis=0)
             ce = C.cross_entropy_with_softmax(preSoftmax, inputTrg[i], 2)
             ce = C.reshape(ce, shape=(1, Config.BatchSize))
             tce += C.times_transpose(ce, self.maskMatrixTrg[i])
@@ -123,7 +125,7 @@ class NMT_Model:
 
     def createDecodingNetworks(self, srcHiddenStates, trgPreWord, trgPreHidden, srcLength):
         preTrgEmb = self.EmbTrg(trgPreWord)
-        decoderHidden = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), preTrgEmb, trgPreHidden, srcLength)
+        (decoderHidden, attProb) = self.createDecoderRNNNetwork(C.slice(srcHiddenStates, 0, 0, srcLength), preTrgEmb, trgPreHidden, srcLength)
         preSoftmax = self.createReadOutNetwork(decoderHidden, preTrgEmb)
         decoderPredict = self.createPredictionNetwork(preSoftmax)
         decoderPredictNet=C.combine(decoderHidden, decoderPredict)

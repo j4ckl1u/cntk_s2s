@@ -69,7 +69,7 @@ class NMT_Trainer:
 
     def validateAndSaveModel(self, i, bestValScore):
         if (i % Config.ValiditionPerBatch == 0):
-            valScore = self.validateBLEU()
+            valScore = self.validate()
             if (valScore < bestValScore):
                 self.model.saveModel(Config.modelF + "." + str(i))
                 bestValScore = valScore
@@ -101,7 +101,7 @@ class NMT_Trainer:
             ceAll += ce
             valBatch = self.valData.getValBatch()
         cePerWord = ceAll/countAll
-        print("Validation Log Likelihood :" + str(cePerWord/math.log(2.0)))
+        print("Validation Log Likelihood :" + str(cePerWord/math.log(2.0)) + " with LR="+ str(self.learningRate)+"\n")
         return cePerWord
 
 
@@ -124,7 +124,7 @@ class NMT_Trainer:
             valTrgTrans.extend(trans)
             valBatch = self.valBleuData.getValBatch()
         bleu = -self.computeBleu(valTrgTrans, valTrgGolden)
-        print("Validation BLEU Score :" + str(bleu))
+        print("Validation BLEU Score :" + str(bleu)+ " with LR="+ str(self.learningRate)+"\n")
         return bleu
 
     def computeBleu(self, trans, golden):
